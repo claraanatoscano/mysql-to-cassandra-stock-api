@@ -102,15 +102,21 @@ def add_stock(db, ticker, date):
 @app.route("/<db>/api/companies/<ticker>/records", methods=["GET"])
 def get_stocks(db, ticker):
     rows = list(SESSION.execute(
-        f"SELECT ticker, date, high, low FROM {db}.stocks WHERE ticker = %s",
+        f"SELECT ticker, name, sector, date, high, low FROM {db}.stocks WHERE ticker = %s",
         (ticker,)
     ))
+    # if no rows at all, ticker doesn't exist
+    if not rows:
+        return jsonify({"error": "not found"}), 404
+    # if only a phantom row (company exists but no stock records), return empty list
     result = []
     for row in rows:
         if row.date is None:
             continue
         result.append({
             "ticker": row.ticker,
+            "name": row.name,
+            "sector": row.sector,
             "date": str(row.date),
             "high": row.high,
             "low": row.low,
@@ -121,7 +127,7 @@ def get_stocks(db, ticker):
 @app.route("/<db>/api/companies/<ticker>/records/<date>", methods=["GET"])
 def get_stock_date(db, ticker, date):
     rows = list(SESSION.execute(
-        f"SELECT ticker, date, high, low FROM {db}.stocks WHERE ticker = %s AND date = %s",
+        f"SELECT ticker, name, sector, date, high, low FROM {db}.stocks WHERE ticker = %s AND date = %s",
         (ticker, date)
     ))
     if not rows or rows[0].date is None:
@@ -129,6 +135,33 @@ def get_stock_date(db, ticker, date):
     row = rows[0]
     return jsonify({"ticker": row.ticker, "date": str(row.date), "high": row.high, "low": row.low})
 
+
+
+@app.route("/<db>/api/companies/<ticker>/records/range", methods=["GET"])
+def get_stock_range(db, ticker):
+    start = request.args.get("start")
+    end = request.args.get("end")
+    if not start or not end:
+        return jsonify({"error": "start and end required"}), 400
+    rows = list(SESSION.execute(
+        f"SELECT ticker, name, sector, date, high, low FROM {db}.stocks WHERE ticker = %s",
+        (ticker,)
+    ))
+    result = []
+    for row in rows:
+        if row.date is None:
+            continue
+        date_str = str(row.date)
+        if start <= date_str <= end:
+            result.append({
+                "ticker": row.ticker,
+                "name": row.name,
+                "sector": row.sector,
+                "date": date_str,
+                "high": row.high,
+                "low": row.low,
+            })
+    return jsonify(result)
 
 @app.route("/<db>/api/companies/<ticker>/records/monthly", methods=["GET"])
 def get_stock_monthly(db, ticker):

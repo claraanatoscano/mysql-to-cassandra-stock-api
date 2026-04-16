@@ -64,7 +64,13 @@ def add_stock(db, ticker, date):
 def get_stocks(db, ticker):
     conn = get_db(db)
     cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT ticker, date, high, low FROM stocks WHERE ticker = %s ORDER BY date", (ticker,))
+    # check company exists first
+    cur.execute("SELECT ticker FROM companies WHERE ticker = %s", (ticker,))
+    if cur.fetchone() is None:
+        cur.close()
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    cur.execute("SELECT s.ticker, c.name, c.sector, s.date, s.high, s.low FROM stocks s JOIN companies c ON s.ticker = c.ticker WHERE s.ticker = %s ORDER BY s.date", (ticker,))
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -76,7 +82,7 @@ def get_stocks(db, ticker):
 def get_stock_date(db, ticker, date):
     conn = get_db(db)
     cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT ticker, date, high, low FROM stocks WHERE ticker = %s AND date = %s", (ticker, date))
+    cur.execute("SELECT s.ticker, c.name, c.sector, s.date, s.high, s.low FROM stocks s JOIN companies c ON s.ticker = c.ticker WHERE s.ticker = %s AND s.date = %s", (ticker, date))
     row = cur.fetchone()
     cur.close()
     conn.close()
@@ -84,6 +90,23 @@ def get_stock_date(db, ticker, date):
         return jsonify({"error": "not found"}), 404
     row["date"] = str(row["date"])
     return jsonify(row)
+
+
+@app.route("/<db>/api/companies/<ticker>/records/range", methods=["GET"])
+def get_stock_range(db, ticker):
+    start = request.args.get("start")
+    end = request.args.get("end")
+    if not start or not end:
+        return jsonify({"error": "start and end required"}), 400
+    conn = get_db(db)
+    cur = conn.cursor(dictionary=True)
+    cur.execute("SELECT s.ticker, c.name, c.sector, s.date, s.high, s.low FROM stocks s JOIN companies c ON s.ticker = c.ticker WHERE s.ticker = %s AND s.date BETWEEN %s AND %s ORDER BY s.date", (ticker, start, end))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    for r in rows:
+        r["date"] = str(r["date"])
+    return jsonify(rows)
 
 @app.route("/<db>/api/companies/<ticker>/records/monthly", methods=["GET"])
 def get_stock_monthly(db, ticker):
