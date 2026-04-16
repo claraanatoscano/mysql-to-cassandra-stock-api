@@ -133,7 +133,7 @@ def get_stock_date(db, ticker, date):
     if not rows or rows[0].date is None:
         return jsonify({"error": "not found"}), 404
     row = rows[0]
-    return jsonify({"ticker": row.ticker, "date": str(row.date), "high": row.high, "low": row.low})
+    return jsonify({"ticker": row.ticker, "name": row.name, "sector": row.sector, "date": str(row.date), "high": row.high, "low": row.low})
 
 
 
